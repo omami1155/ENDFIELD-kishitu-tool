@@ -207,8 +207,7 @@ def 武器名から周回プランを提案(
 
         pool = [w for w in weapons if 正解基質がダンジョンで出る(w, d)]
 
-        slots: Tuple[固定スロット, ...] = ("付加効果", "スキル効果")
-        for fixed_slot in slots:
+        for fixed_slot in ("付加効果", "スキル効果"):
             fixed_value = target.付加効果 if fixed_slot == "付加効果" else target.スキル効果
 
             if fixed_slot == "付加効果" and fixed_value not in d.出る付加効果:
@@ -264,6 +263,15 @@ def 武器種と武器名に分解(name: str) -> Tuple[str, str]:
 st.set_page_config(page_title="基質ルート最適化ツール", layout="wide")
 st.title("基質ルート最適化ツール")
 
+if "plans_result" not in st.session_state:
+    st.session_state["plans_result"] = None
+if "plans_weapon" not in st.session_state:
+    st.session_state["plans_weapon"] = None
+if "reverse_result" not in st.session_state:
+    st.session_state["reverse_result"] = None
+if "reverse_key" not in st.session_state:
+    st.session_state["reverse_key"] = None
+
 tab1, tab2 = st.tabs(["武器→周回プラン", "基質→武器逆引き"])
 
 with tab1:
@@ -273,23 +281,30 @@ with tab1:
         武器種ごと[t].append(w.name)
 
     武器種一覧 = sorted(武器種ごと.keys())
-    武器種 = st.selectbox("武器種", 武器種一覧)
+    武器種 = st.selectbox("武器種", 武器種一覧, key="weapon_type")
 
     武器名一覧 = sorted(武器種ごと[武器種])
-    武器名 = st.selectbox("武器名", 武器名一覧)
+    武器名 = st.selectbox("武器名", 武器名一覧, key="weapon_name")
 
-    表示件数 = st.slider("表示件数", min_value=1, max_value=30, value=5, step=1)
+    表示件数 = st.slider("表示件数", min_value=1, max_value=30, value=5, step=1, key="topn")
 
-    if st.button("検索", type="primary"):
+    if st.button("検索", type="primary", key="search_btn"):
         plans = 武器名から周回プランを提案(武器名, WEAPONS, DUNGEONS, top_n=表示件数)
+        st.session_state["plans_result"] = plans
+        st.session_state["plans_weapon"] = 武器名
+
+    plans = st.session_state.get("plans_result")
+    target_name = st.session_state.get("plans_weapon")
+
+    if plans is not None and target_name is not None:
         if not plans:
             st.warning("プランが見つかりませんでした。")
         else:
-            st.subheader(f"検索武器: {武器名}")
+            st.subheader(f"検索武器: {target_name}")
             for pl in plans:
                 base_list = " / ".join(表示_基礎(i) for i in sorted(pl.絞り.基礎効果候補))
                 fixed_value_str = 表示_付加(pl.絞り.固定する効果) if pl.絞り.固定する枠 == "付加効果" else 表示_スキル(pl.絞り.固定する効果)
-                others = [w.name for w in pl.同時に狙える武器 if w.name != 武器名]
+                others = [w.name for w in pl.同時に狙える武器 if w.name != target_name]
 
                 st.markdown(f"### ■ {pl.dungeon}")
                 st.write(f"基礎効果候補: {base_list}")
@@ -300,18 +315,26 @@ with tab1:
                     st.write("一緒に狙える: （他なし）")
 
 with tab2:
-    基礎名 = st.selectbox("基礎効果", sorted(基礎効果名_to_ID.keys()))
-    付加名 = st.selectbox("付加効果", sorted(付加効果名_to_ID.keys()))
-    スキル名 = st.selectbox("スキル効果", sorted(スキル効果名_to_ID.keys()))
+    基礎名 = st.selectbox("基礎効果", sorted(基礎効果名_to_ID.keys()), key="rev_base")
+    付加名 = st.selectbox("付加効果", sorted(付加効果名_to_ID.keys()), key="rev_add")
+    スキル名 = st.selectbox("スキル効果", sorted(スキル効果名_to_ID.keys()), key="rev_skill")
 
-    if st.button("逆引き検索", type="primary"):
+    if st.button("逆引き検索", type="primary", key="rev_btn"):
         b = 基礎効果名_to_ID[基礎名]
         a = 付加効果名_to_ID[付加名]
         s = スキル効果名_to_ID[スキル名]
-
         ws = 逆引き_基質に一致する武器(b, a, s, WEAPONS)
 
-        st.subheader(f"選択基質: {基礎名} / {付加名} / {スキル名}")
+        st.session_state["reverse_result"] = ws
+        st.session_state["reverse_key"] = (基礎名, 付加名, スキル名)
+
+    ws = st.session_state.get("reverse_result")
+    k = st.session_state.get("reverse_key")
+
+    if ws is not None and k is not None:
+        基礎名2, 付加名2, スキル名2 = k
+        st.subheader(f"選択基質: {基礎名2} / {付加名2} / {スキル名2}")
+
         if not ws:
             st.warning("一致する武器はありません。")
         else:
