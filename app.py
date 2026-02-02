@@ -320,17 +320,25 @@ st.sidebar.download_button(
 )
 
 up = st.sidebar.file_uploader("状態を読み込み（JSON）", type=["json"])
+
+if "last_uploaded_file_id" not in st.session_state:
+    st.session_state["last_uploaded_file_id"] = None
+
 if up is not None:
-    try:
-        JSONから状態を復元する(up.read().decode("utf-8"))
-        st.sidebar.success("復元しました。")
-    except Exception as e:
-        st.sidebar.error(f"読み込みに失敗しました: {e}")
+    file_id = (up.name, up.size)
+    if st.session_state["last_uploaded_file_id"] != file_id:
+        try:
+            JSONから状態を復元する(up.read().decode("utf-8"))
+            st.session_state["last_uploaded_file_id"] = file_id
+            st.sidebar.success("復元しました。")
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"読み込みに失敗しました: {e}")
 
 if st.sidebar.button("状態を初期化（全未所持/未達成）"):
     st.session_state["owned"] = {w.name: False for w in WEAPONS}
     st.session_state["done"] = {w.name: False for w in WEAPONS}
-    st.sidebar.success("初期化しました。")
+    st.session_state["last_uploaded_file_id"] = None
     st.rerun()
 
 st.sidebar.divider()
@@ -346,11 +354,17 @@ for name in 編集対象:
     with col1:
         st.session_state["owned"][name] = st.checkbox(name, value=st.session_state["owned"].get(name, False), key=f"owned_{name}")
     with col2:
-        done_val = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=f"done_{name}")
+        done_key = f"done_{name}"
+        done_val = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=done_key)
+
+        prev_done = st.session_state["done"].get(name, False)
         st.session_state["done"][name] = done_val
+
         if done_val:
             st.session_state["owned"][name] = True
-            st.session_state[f"owned_{name}"] = True
+
+        if (not prev_done) and done_val:
+            st.rerun()
 
 tab1, tab2 = st.tabs(["周回プラン", "基質逆引き"])
 
