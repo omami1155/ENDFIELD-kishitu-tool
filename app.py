@@ -324,7 +324,6 @@ if up is not None:
     try:
         JSONから状態を復元する(up.read().decode("utf-8"))
         st.sidebar.success("復元しました。")
-        st.rerun()
     except Exception as e:
         st.sidebar.error(f"読み込みに失敗しました: {e}")
 
