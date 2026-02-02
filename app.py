@@ -305,6 +305,19 @@ if "reverse_result" not in st.session_state:
 if "reverse_key" not in st.session_state:
     st.session_state["reverse_key"] = None
 
+st.sidebar.markdown("## 📢 お知らせ")
+
+st.sidebar.info(
+    "このツールは所持武器・達成状況をもとに基質の周回プランを提案します。\n\n"
+    "初めての方は、下の「所持 / 達成の編集」から自分の状態を設定してください。\n\n"
+    "設定後は『状態を保存』でローカルファイルに保存しておくと、"
+    "次回ファイルのドラッグ＆ドロップで復元できます。\n\n"
+    "復元後は表示に反映させるために、武器種を一度切り替えてください。"
+)
+
+st.sidebar.caption("※ データはブラウザに保存されないため、JSON保存を推奨します")
+st.sidebar.caption("Version 1.1.0 レーヴァテイン実装")
+
 st.sidebar.header("フィルタ")
 除外_未所持 = st.sidebar.checkbox("未所持の武器を除外", value=True)
 除外_達成済 = st.sidebar.checkbox("正解基質を獲得済みの武器を除外", value=True)
