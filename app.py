@@ -260,8 +260,23 @@ def 武器種と武器名に分解(name: str) -> Tuple[str, str]:
     t, n = name.split("-", 1)
     return t, n
 
+def フィルタ済み武器(weapons: Iterable[武器], 除外_未所持: bool, 除外_達成済: bool) -> list[武器]:
+    out: list[武器] = []
+    for w in weapons:
+        if 除外_未所持 and not st.session_state["owned"].get(w.name, False):
+            continue
+        if 除外_達成済 and st.session_state["done"].get(w.name, False):
+            continue
+        out.append(w)
+    return out
+
 st.set_page_config(page_title="基質周回最適化ツール", layout="wide")
 st.title("基質周回最適化ツール")
+
+if "owned" not in st.session_state:
+    st.session_state["owned"] = {w.name: False for w in WEAPONS}
+if "done" not in st.session_state:
+    st.session_state["done"] = {w.name: False for w in WEAPONS}
 
 if "plans_result" not in st.session_state:
     st.session_state["plans_result"] = None
@@ -271,6 +286,25 @@ if "reverse_result" not in st.session_state:
     st.session_state["reverse_result"] = None
 if "reverse_key" not in st.session_state:
     st.session_state["reverse_key"] = None
+
+st.sidebar.header("フィルタ")
+除外_未所持 = st.sidebar.checkbox("未所持の武器を除外", value=True)
+除外_達成済 = st.sidebar.checkbox("正解基質を獲得済みの武器を除外", value=True)
+
+st.sidebar.divider()
+st.sidebar.subheader("所持 / 達成の編集")
+
+武器種一覧_sidebar = sorted({武器種と武器名に分解(w.name)[0] for w in WEAPONS})
+編集_武器種 = st.sidebar.selectbox("武器種", 武器種一覧_sidebar, key="edit_type")
+
+編集対象 = sorted([w.name for w in WEAPONS if 武器種と武器名に分解(w.name)[0] == 編集_武器種])
+
+for name in 編集対象:
+    col1, col2 = st.sidebar.columns([3, 1])
+    with col1:
+        st.session_state["owned"][name] = st.checkbox(name, value=st.session_state["owned"].get(name, False), key=f"owned_{name}")
+    with col2:
+        st.session_state["done"][name] = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=f"done_{name}")
 
 tab1, tab2 = st.tabs(["周回プラン", "基質逆引き"])
 
@@ -283,15 +317,26 @@ with tab1:
     武器種一覧 = sorted(武器種ごと.keys())
     武器種 = st.selectbox("武器種", 武器種一覧, key="weapon_type")
 
-    武器名一覧 = sorted(武器種ごと[武器種])
-    武器名 = st.selectbox("武器名", 武器名一覧, key="weapon_name")
+    candidates = []
+    for name in sorted(武器種ごと[武器種]):
+        if 除外_未所持 and not st.session_state["owned"].get(name, False):
+            continue
+        if 除外_達成済 and st.session_state["done"].get(name, False):
+            continue
+        candidates.append(name)
 
-    表示件数 = st.slider("表示件数", min_value=1, max_value=30, value=5, step=1, key="topn")
+    if not candidates:
+        st.warning("この条件だと選べる武器がありません（サイドバーで所持/達成を調整してください）。")
+    else:
+        武器名 = st.selectbox("武器名", candidates, key="weapon_name")
 
-    if st.button("検索", type="primary", key="search_btn"):
-        plans = 武器名から周回プランを提案(武器名, WEAPONS, DUNGEONS, top_n=表示件数)
-        st.session_state["plans_result"] = plans
-        st.session_state["plans_weapon"] = 武器名
+        表示件数 = st.slider("表示件数", min_value=1, max_value=30, value=5, step=1, key="topn")
+
+        if st.button("検索", type="primary", key="search_btn"):
+            wf = フィルタ済み武器(WEAPONS, 除外_未所持, 除外_達成済)
+            plans = 武器名から周回プランを提案(武器名, wf, DUNGEONS, top_n=表示件数)
+            st.session_state["plans_result"] = plans
+            st.session_state["plans_weapon"] = 武器名
 
     plans = st.session_state.get("plans_result")
     target_name = st.session_state.get("plans_weapon")
@@ -323,7 +368,9 @@ with tab2:
         b = 基礎効果名_to_ID[基礎名]
         a = 付加効果名_to_ID[付加名]
         s = スキル効果名_to_ID[スキル名]
-        ws = 逆引き_基質に一致する武器(b, a, s, WEAPONS)
+
+        wf = フィルタ済み武器(WEAPONS, 除外_未所持, 除外_達成済)
+        ws = 逆引き_基質に一致する武器(b, a, s, wf)
 
         st.session_state["reverse_result"] = ws
         st.session_state["reverse_key"] = (基礎名, 付加名, スキル名)
@@ -336,7 +383,7 @@ with tab2:
         st.subheader(f"選択基質: {基礎名2} / {付加名2} / {スキル名2}")
 
         if not ws:
-            st.warning("基質食刻に使えます")
+            st.warning("一致する武器はありません。")
         else:
             grp: dict[str, list[str]] = defaultdict(list)
             for w in ws:
