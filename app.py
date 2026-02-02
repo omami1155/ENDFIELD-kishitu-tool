@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Dict, FrozenSet, Iterable, Literal, Tuple
 from collections import defaultdict
+import json
 
 import streamlit as st
 
@@ -278,6 +279,23 @@ if "owned" not in st.session_state:
 if "done" not in st.session_state:
     st.session_state["done"] = {w.name: False for w in WEAPONS}
 
+def 状態をJSONにする() -> str:
+    data = {
+        "owned": st.session_state["owned"],
+        "done": st.session_state["done"],
+    }
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+def JSONから状態を復元する(json_text: str) -> None:
+    data = json.loads(json_text)
+
+    owned_in = data.get("owned", {})
+    done_in = data.get("done", {})
+
+    for w in WEAPONS:
+        st.session_state["owned"][w.name] = bool(owned_in.get(w.name, False))
+        st.session_state["done"][w.name] = bool(done_in.get(w.name, False))
+
 if "plans_result" not in st.session_state:
     st.session_state["plans_result"] = None
 if "plans_weapon" not in st.session_state:
@@ -290,6 +308,30 @@ if "reverse_key" not in st.session_state:
 st.sidebar.header("フィルタ")
 除外_未所持 = st.sidebar.checkbox("未所持の武器を除外", value=True)
 除外_達成済 = st.sidebar.checkbox("正解基質を獲得済みの武器を除外", value=True)
+
+st.sidebar.subheader("保存 / 復元")
+
+json_text = 状態をJSONにする()
+st.sidebar.download_button(
+    label="状態を保存（JSON）",
+    data=json_text,
+    file_name="kisitu_state.json",
+    mime="application/json",
+)
+
+up = st.sidebar.file_uploader("状態を読み込み（JSON）", type=["json"])
+if up is not None:
+    try:
+        JSONから状態を復元する(up.read().decode("utf-8"))
+        st.sidebar.success("復元しました。")
+    except Exception as e:
+        st.sidebar.error(f"読み込みに失敗しました: {e}")
+
+if st.sidebar.button("状態を初期化（全未所持/未達成）"):
+    st.session_state["owned"] = {w.name: False for w in WEAPONS}
+    st.session_state["done"] = {w.name: False for w in WEAPONS}
+    st.sidebar.success("初期化しました。")
+    st.rerun()
 
 st.sidebar.divider()
 st.sidebar.subheader("所持 / 達成の編集")
