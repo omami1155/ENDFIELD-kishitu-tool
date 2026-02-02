@@ -456,7 +456,7 @@ with tab2:
         st.subheader(f"選択基質: {基礎名2} / {付加名2} / {スキル名2}")
 
         if not ws:
-            st.warning("一致する武器はありません(砕いてOK)")
+            st.warning("一致する武器が無い、または全て達成済みです(砕いておK)")
         else:
             grp: dict[str, list[str]] = defaultdict(list)
             for w in ws:
