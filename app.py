@@ -260,8 +260,8 @@ def 武器種と武器名に分解(name: str) -> Tuple[str, str]:
     t, n = name.split("-", 1)
     return t, n
 
-st.set_page_config(page_title="基質ルート最適化ツール", layout="wide")
-st.title("基質ルート最適化ツール")
+st.set_page_config(page_title="基質周回最適化ツール", layout="wide")
+st.title("基質周回最適化ツール")
 
 if "plans_result" not in st.session_state:
     st.session_state["plans_result"] = None
@@ -272,7 +272,7 @@ if "reverse_result" not in st.session_state:
 if "reverse_key" not in st.session_state:
     st.session_state["reverse_key"] = None
 
-tab1, tab2 = st.tabs(["武器→周回プラン", "基質→武器逆引き"])
+tab1, tab2 = st.tabs(["周回プラン", "基質逆引き"])
 
 with tab1:
     武器種ごと = defaultdict(list)
@@ -336,7 +336,7 @@ with tab2:
         st.subheader(f"選択基質: {基礎名2} / {付加名2} / {スキル名2}")
 
         if not ws:
-            st.warning("一致する武器はありません。")
+            st.warning("一致する武器はありません")
         else:
             grp: dict[str, list[str]] = defaultdict(list)
             for w in ws:
