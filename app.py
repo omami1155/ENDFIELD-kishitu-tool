@@ -310,9 +310,9 @@ with tab1:
                 st.write(f"基礎効果候補: {base_list}")
                 st.write(f"{pl.絞り.固定する枠}固定: {fixed_value_str}")
                 if others:
-                    st.write("一緒に狙える: " + ", ".join(others))
+                    st.write("一緒に狙える武器: " + ", ".join(others))
                 else:
-                    st.write("一緒に狙える: （他なし）")
+                    st.write("一緒に狙える武器はありません")
 
 with tab2:
     基礎名 = st.selectbox("基礎効果", sorted(基礎効果名_to_ID.keys()), key="rev_base")
@@ -336,7 +336,7 @@ with tab2:
         st.subheader(f"選択基質: {基礎名2} / {付加名2} / {スキル名2}")
 
         if not ws:
-            st.warning("一致する武器はありません")
+            st.warning("基質食刻に使えます")
         else:
             grp: dict[str, list[str]] = defaultdict(list)
             for w in ws:
