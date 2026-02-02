@@ -324,6 +324,7 @@ if up is not None:
     try:
         JSONから状態を復元する(up.read().decode("utf-8"))
         st.sidebar.success("復元しました。")
+        st.rerun()
     except Exception as e:
         st.sidebar.error(f"読み込みに失敗しました: {e}")
 
@@ -346,7 +347,11 @@ for name in 編集対象:
     with col1:
         st.session_state["owned"][name] = st.checkbox(name, value=st.session_state["owned"].get(name, False), key=f"owned_{name}")
     with col2:
-        st.session_state["done"][name] = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=f"done_{name}")
+        done_val = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=f"done_{name}")
+        st.session_state["done"][name] = done_val
+        if done_val:
+            st.session_state["owned"][name] = True
+            st.session_state[f"owned_{name}"] = True
 
 tab1, tab2 = st.tabs(["周回プラン", "基質逆引き"])
 
