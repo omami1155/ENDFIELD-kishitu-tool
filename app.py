@@ -2,8 +2,9 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Dict, FrozenSet, Iterable, Literal, Tuple
 from collections import defaultdict
-import ipywidgets as widgets
-from IPython.display import display, clear_output
+import json
+
+import streamlit as st
 
 固定スロット = Literal["付加効果", "スキル効果"]
 
