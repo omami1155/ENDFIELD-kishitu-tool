@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Dict, FrozenSet, Iterable, Literal, Tuple
 from collections import defaultdict
+import json
 
 import streamlit as st
 
@@ -51,14 +52,18 @@ import streamlit as st
 付加効果名_to_ID: Dict[str, int] = {v: k for k, v in 付加効果ID_to_名前.items()}
 スキル効果名_to_ID: Dict[str, int] = {v: k for k, v in スキル効果ID_to_名前.items()}
 
+
 def 表示_基礎(i: int) -> str:
     return 基礎効果ID_to_名前.get(i, f"未定義({i})")
+
 
 def 表示_付加(i: int) -> str:
     return 付加効果ID_to_名前.get(i, f"未定義({i})")
 
+
 def 表示_スキル(i: int) -> str:
     return スキル効果ID_to_名前.get(i, f"未定義({i})")
+
 
 @dataclass(frozen=True)
 class 武器:
@@ -67,12 +72,14 @@ class 武器:
     付加効果: int
     スキル効果: int
 
+
 @dataclass(frozen=True)
 class ダンジョン:
     name: str
     出る基礎効果: FrozenSet[int]
     出る付加効果: FrozenSet[int]
     出るスキル効果: FrozenSet[int]
+
 
 @dataclass(frozen=True)
 class 絞り込み:
@@ -81,12 +88,14 @@ class 絞り込み:
     固定する枠: 固定スロット
     固定する効果: int
 
+
 @dataclass(frozen=True)
 class 周回プラン:
     dungeon: str
     絞り: 絞り込み
     同時に狙える武器: Tuple[武器, ...]
     スコア: Tuple[int, int]
+
 
 DUNGEONS: dict[str, ダンジョン] = {
     "中枢エリア": ダンジョン(
@@ -184,12 +193,14 @@ WEAPONS: list[武器] = [
     武器("アーツユニット-騎士精神", 3, 12, 11),
 ]
 
+
 def 正解基質がダンジョンで出る(w: 武器, d: ダンジョン) -> bool:
     return (
-        (w.基礎効果 in d.出る基礎効果) and
-        (w.付加効果 in d.出る付加効果) and
-        (w.スキル効果 in d.出るスキル効果)
+        (w.基礎効果 in d.出る基礎効果)
+        and (w.付加効果 in d.出る付加効果)
+        and (w.スキル効果 in d.出るスキル効果)
     )
+
 
 def 絞り込みで正解が拾える(w: 武器, d: ダンジョン, f: 絞り込み) -> bool:
     if f.dungeon != d.name:
@@ -201,6 +212,7 @@ def 絞り込みで正解が拾える(w: 武器, d: ダンジョン, f: 絞り�
     if f.固定する枠 == "付加効果":
         return w.付加効果 == f.固定する効果
     return w.スキル効果 == f.固定する効果
+
 
 def 武器名から周回プランを提案(
     weapon_name: str,
@@ -250,16 +262,27 @@ def 武器名から周回プランを提案(
                     if target not in matched:
                         continue
 
-                    score = (len(matched), -len(f.基礎効果候補))
-                    plans.append(周回プラン(
-                        dungeon=d.name,
-                        絞り=f,
-                        同時に狙える武器=matched,
-                        スコア=score,
-                    ))
+                    score = (len(matched), len(f.基礎効果候補))
+                    plans.append(
+                        周回プラン(
+                            dungeon=d.name,
+                            絞り=f,
+                            同時に狙える武器=matched,
+                            スコア=score,
+                        )
+                    )
 
-    plans.sort(key=lambda x: (-x.スコア[0], x.dungeon, x.スコア[1], x.絞り.固定する枠, x.絞り.固定する効果))
+    plans.sort(
+        key=lambda x: (
+            -x.スコア[0],           # 同時に狙える武器が多いほど上
+            x.スコア[1],            # 基礎効果候補が少ないほど上
+            x.dungeon,
+            x.絞り.固定する枠,
+            x.絞り.固定する効果,
+        )
+    )
     return plans[:top_n]
+
 
 def 逆引き_基質に一致する武器(基礎: int, 付加: int, スキル: int, weapons: Iterable[武器]) -> list[武器]:
     out: list[武器] = []
@@ -269,9 +292,11 @@ def 逆引き_基質に一致する武器(基礎: int, 付加: int, スキル: i
     out.sort(key=lambda x: x.name)
     return out
 
+
 def 武器種と武器名に分解(name: str) -> Tuple[str, str]:
     t, n = name.split("-", 1)
     return t, n
+
 
 def フィルタ済み武器(weapons: Iterable[武器], 除外_未所持: bool, 除外_達成済: bool) -> list[武器]:
     out: list[武器] = []
@@ -282,6 +307,31 @@ def フィルタ済み武器(weapons: Iterable[武器], 除外_未所持: bool, 
             continue
         out.append(w)
     return out
+
+
+def 保存データを作る() -> dict:
+    return {
+        "owned": st.session_state.get("owned", {}),
+        "done": st.session_state.get("done", {}),
+    }
+
+
+def 保存データを適用(data: dict) -> None:
+    owned = data.get("owned", {})
+    done = data.get("done", {})
+
+    st.session_state["owned"] = {
+        w.name: bool(owned.get(w.name, False)) for w in WEAPONS
+    }
+    st.session_state["done"] = {
+        w.name: bool(done.get(w.name, False)) for w in WEAPONS
+    }
+
+    st.session_state["plans_result"] = None
+    st.session_state["plans_weapon"] = None
+    st.session_state["reverse_result"] = None
+    st.session_state["reverse_key"] = None
+
 
 st.set_page_config(page_title="基質周回最適化ツール", layout="wide")
 st.title("基質周回最適化ツール")
@@ -301,8 +351,34 @@ if "reverse_key" not in st.session_state:
     st.session_state["reverse_key"] = None
 
 st.sidebar.header("フィルタ")
-除外_未所持 = st.sidebar.checkbox("未所持の武器を除外", value=True)
+除外_未所持 = st.sidebar.checkbox("未所持の武器を除外", value=False)
 除外_達成済 = st.sidebar.checkbox("正解基質を獲得済みの武器を除外", value=True)
+
+st.sidebar.divider()
+st.sidebar.subheader("保存 / 読込")
+
+保存json = json.dumps(保存データを作る(), ensure_ascii=False, indent=2)
+
+st.sidebar.download_button(
+    label="状態を保存(JSON)",
+    data=保存json,
+    file_name="基質周回状態.json",
+    mime="application/json",
+)
+
+読込ファイル = st.sidebar.file_uploader(
+    "状態を読み込む(JSON)",
+    type=["json"],
+    key="save_file_uploader",
+)
+
+if 読込ファイル is not None:
+    try:
+        data = json.load(読込ファイル)
+        保存データを適用(data)
+        st.sidebar.success("保存データを読み込みました。")
+    except Exception as e:
+        st.sidebar.error(f"読み込みに失敗しました: {e}")
 
 st.sidebar.divider()
 st.sidebar.subheader("所持 / 達成の編集")
@@ -315,9 +391,17 @@ st.sidebar.subheader("所持 / 達成の編集")
 for name in 編集対象:
     col1, col2 = st.sidebar.columns([3, 1])
     with col1:
-        st.session_state["owned"][name] = st.checkbox(name, value=st.session_state["owned"].get(name, False), key=f"owned_{name}")
+        st.session_state["owned"][name] = st.checkbox(
+            name,
+            value=st.session_state["owned"].get(name, False),
+            key=f"owned_{name}",
+        )
     with col2:
-        st.session_state["done"][name] = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=f"done_{name}")
+        st.session_state["done"][name] = st.checkbox(
+            "達成",
+            value=st.session_state["done"].get(name, False),
+            key=f"done_{name}",
+        )
 
 tab1, tab2 = st.tabs(["周回プラン", "基質逆引き"])
 
@@ -361,7 +445,11 @@ with tab1:
             st.subheader(f"検索武器: {target_name}")
             for pl in plans:
                 base_list = " / ".join(表示_基礎(i) for i in sorted(pl.絞り.基礎効果候補))
-                fixed_value_str = 表示_付加(pl.絞り.固定する効果) if pl.絞り.固定する枠 == "付加効果" else 表示_スキル(pl.絞り.固定する効果)
+                fixed_value_str = (
+                    表示_付加(pl.絞り.固定する効果)
+                    if pl.絞り.固定する枠 == "付加効果"
+                    else 表示_スキル(pl.絞り.固定する効果)
+                )
                 others = [w.name for w in pl.同時に狙える武器 if w.name != target_name]
 
                 st.markdown(f"### ■ {pl.dungeon}")
@@ -406,4 +494,4 @@ with tab2:
             for t in sorted(grp.keys()):
                 st.markdown(f"### ■ {t}")
                 for n in sorted(grp[t]):
-                    st.write(f"- {t}-{n}")
+                    st.markdown(f"- {t}-{n}")
