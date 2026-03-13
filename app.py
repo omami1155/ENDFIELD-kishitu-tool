@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Dict, FrozenSet, Iterable, Literal, Tuple
 from collections import defaultdict
-import json
 
 import streamlit as st
+
 
 固定スロット = Literal["付加効果", "スキル効果"]
 
@@ -52,14 +52,18 @@ import streamlit as st
 付加効果名_to_ID: Dict[str, int] = {v: k for k, v in 付加効果ID_to_名前.items()}
 スキル効果名_to_ID: Dict[str, int] = {v: k for k, v in スキル効果ID_to_名前.items()}
 
+
 def 表示_基礎(i: int) -> str:
     return 基礎効果ID_to_名前.get(i, f"未定義({i})")
+
 
 def 表示_付加(i: int) -> str:
     return 付加効果ID_to_名前.get(i, f"未定義({i})")
 
+
 def 表示_スキル(i: int) -> str:
     return スキル効果ID_to_名前.get(i, f"未定義({i})")
+
 
 @dataclass(frozen=True)
 class 武器:
@@ -68,12 +72,14 @@ class 武器:
     付加効果: int
     スキル効果: int
 
+
 @dataclass(frozen=True)
 class ダンジョン:
     name: str
     出る基礎効果: FrozenSet[int]
     出る付加効果: FrozenSet[int]
     出るスキル効果: FrozenSet[int]
+
 
 @dataclass(frozen=True)
 class 絞り込み:
@@ -82,12 +88,14 @@ class 絞り込み:
     固定する枠: 固定スロット
     固定する効果: int
 
+
 @dataclass(frozen=True)
 class 周回プラン:
     dungeon: str
     絞り: 絞り込み
     同時に狙える武器: Tuple[武器, ...]
     スコア: Tuple[int, int]
+
 
 DUNGEONS: dict[str, ダンジョン] = {
     "中枢エリア": ダンジョン(
@@ -144,6 +152,7 @@ WEAPONS: list[武器] = [
     武器("片手剣-輝かしき名声", 5, 2, 13),
     武器("片手剣-白夜新星", 5, 9, 10),
     武器("片手剣-栄光の記憶", 1, 7, 14),
+
     武器("大剣-探龍", 2, 8, 6),
     武器("大剣-千古恒常", 2, 9, 13),
     武器("大剣-最期の声", 2, 12, 11),
@@ -153,12 +162,14 @@ WEAPONS: list[武器] = [
     武器("大剣-鑑", 5, 1, 2),
     武器("大剣-昔日の逸品", 3, 12, 8),
     武器("大剣-破砕君主", 2, 7, 4),
+
     武器("長柄武器-正義嵌合", 2, 8, 13),
     武器("長柄武器-O.B.J.鋭矛", 3, 2, 10),
     武器("長柄武器-求心の槍", 3, 4, 2),
     武器("長柄武器-負山", 1, 2, 8),
     武器("長柄武器-勇猛", 1, 2, 5),
     武器("長柄武器-J.E.T.", 5, 1, 2),
+
     武器("拳銃-作品:衆生", 1, 10, 10),
     武器("拳銃-O.B.J.迅速", 1, 8, 6),
     武器("拳銃-合理的決別", 2, 3, 3),
@@ -168,6 +179,7 @@ WEAPONS: list[武器] = [
     武器("拳銃-同類共食", 5, 10, 10),
     武器("拳銃-落草", 1, 1, 6),
     武器("拳銃-望郷", 1, 5, 2),
+
     武器("アーツユニット-弔いの詩", 4, 1, 14),
     武器("アーツユニット-術無", 3, 8, 9),
     武器("アーツユニット-荒野迷走", 4, 4, 10),
@@ -181,12 +193,14 @@ WEAPONS: list[武器] = [
     武器("アーツユニット-騎士精神", 3, 12, 11),
 ]
 
+
 def 正解基質がダンジョンで出る(w: 武器, d: ダンジョン) -> bool:
     return (
-        (w.基礎効果 in d.出る基礎効果) and
-        (w.付加効果 in d.出る付加効果) and
-        (w.スキル効果 in d.出るスキル効果)
+        (w.基礎効果 in d.出る基礎効果)
+        and (w.付加効果 in d.出る付加効果)
+        and (w.スキル効果 in d.出るスキル効果)
     )
+
 
 def 絞り込みで正解が拾える(w: 武器, d: ダンジョン, f: 絞り込み) -> bool:
     if f.dungeon != d.name:
@@ -198,6 +212,7 @@ def 絞り込みで正解が拾える(w: 武器, d: ダンジョン, f: 絞り�
     if f.固定する枠 == "付加効果":
         return w.付加効果 == f.固定する効果
     return w.スキル効果 == f.固定する効果
+
 
 def 武器名から周回プランを提案(
     weapon_name: str,
@@ -249,36 +264,26 @@ def 武器名から周回プランを提案(
                         continue
 
                     score = (len(matched), -len(f.基礎効果候補))
-                    plans.append(周回プラン(
-                        dungeon=d.name,
-                        絞り=f,
-                        同時に狙える武器=matched,
-                        スコア=score,
-                    ))
+                    plans.append(
+                        周回プラン(
+                            dungeon=d.name,
+                            絞り=f,
+                            同時に狙える武器=matched,
+                            スコア=score,
+                        )
+                    )
 
-    plans.sort(key=lambda x: (-x.スコア[0], x.dungeon, x.スコア[1], x.絞り.固定する枠, x.絞り.固定する効果))
+    plans.sort(
+        key=lambda x: (
+            -x.スコア[0],
+            x.dungeon,
+            x.スコア[1],
+            x.絞り.固定する枠,
+            x.絞り.固定する効果,
+        )
+    )
     return plans[:top_n]
 
-def 周回プランを文字で表示(plans: list[周回プラン], target_name: str) -> None:
-    if not plans:
-        print("プランが見つかりませんでした。")
-        return
-
-    print(f"検索武器: {target_name}")
-    print("==================================================")
-
-    for pl in plans:
-        base_list = " / ".join(表示_基礎(i) for i in sorted(pl.絞り.基礎効果候補))
-        fixed_value_str = 表示_付加(pl.絞り.固定する効果) if pl.絞り.固定する枠 == "付加効果" else 表示_スキル(pl.絞り.固定する効果)
-        others = [w.name for w in pl.同時に狙える武器 if w.name != target_name]
-
-        print(f"\n■ {pl.dungeon}")
-        print(f"  基礎効果候補: {base_list}")
-        print(f"  {pl.絞り.固定する枠}固定: {fixed_value_str}")
-        if others:
-            print(f"  一緒に狙える: {', '.join(others)}")
-        else:
-            print("  他に同時に狙える武器はなし")
 
 def 基質から武器を逆引き(基礎: int, 付加: int, スキル: int, weapons: Iterable[武器]) -> list[武器]:
     out: list[武器] = []
@@ -288,80 +293,101 @@ def 基質から武器を逆引き(基礎: int, 付加: int, スキル: int, wea
     out.sort(key=lambda x: x.name)
     return out
 
-def 武器一覧を武器種で表示(ws: list[武器]) -> None:
-    if not ws:
-        print("一致する武器はありません。")
+
+def 周回プランをstreamlit表示(plans: list[周回プラン], target_name: str) -> None:
+    if not plans:
+        st.warning("プランが見つかりませんでした。")
         return
+
+    st.subheader(f"検索武器: {target_name}")
+
+    for i, pl in enumerate(plans, start=1):
+        base_list = " / ".join(表示_基礎(x) for x in sorted(pl.絞り.基礎効果候補))
+        fixed_value_str = (
+            表示_付加(pl.絞り.固定する効果)
+            if pl.絞り.固定する枠 == "付加効果"
+            else 表示_スキル(pl.絞り.固定する効果)
+        )
+        others = [w.name for w in pl.同時に狙える武器 if w.name != target_name]
+
+        with st.container(border=True):
+            st.markdown(f"### {i}. {pl.dungeon}")
+            st.write(f"基礎効果候補: {base_list}")
+            st.write(f"{pl.絞り.固定する枠}固定: {fixed_value_str}")
+            st.write(f"同時に狙える総数: {len(pl.同時に狙える武器)}")
+            if others:
+                st.write("一緒に狙える:")
+                for name in others:
+                    st.write(f"- {name}")
+            else:
+                st.write("他に同時に狙える武器はなし")
+
+
+def 武器一覧をstreamlit表示(ws: list[武器]) -> None:
+    if not ws:
+        st.warning("一致する武器はありません。")
+        return
+
     grp: dict[str, list[str]] = defaultdict(list)
     for w in ws:
         t, n = w.name.split("-", 1)
         grp[t].append(n)
-    for t in sorted(grp.keys()):
-        print(f"\n■ {t}")
-        for n in sorted(grp[t]):
-            print(f"  - {t}-{n}")
 
-武器種ごと = defaultdict(list)
+    for t in sorted(grp.keys()):
+        st.markdown(f"### {t}")
+        for n in sorted(grp[t]):
+            st.write(f"- {t}-{n}")
+
+
+# -----------------------------
+# Streamlit UI
+# -----------------------------
+st.set_page_config(page_title="Endfield 基質ツール", layout="wide")
+st.title("Endfield 基質ツール")
+
+武器種ごと: dict[str, list[str]] = defaultdict(list)
 for w in WEAPONS:
     武器種, _武器名 = w.name.split("-", 1)
     武器種ごと[武器種].append(w.name)
 
 武器種一覧 = sorted(武器種ごと.keys())
 
-武器種ドロップ = widgets.Dropdown(options=武器種一覧, description="武器種:")
-武器名ドロップ = widgets.Dropdown(description="武器名:")
-表示件数スライダー = widgets.IntSlider(value=5, min=1, max=30, step=1, description="表示件数:")
-検索ボタン = widgets.Button(description="検索")
-出力エリア1 = widgets.Output()
+tab1, tab2 = st.tabs(["武器→周回プラン", "基質→武器逆引き"])
 
-def 武器種変更時(change):
-    選択種 = change["new"]
-    opts = sorted(武器種ごと[選択種])
-    武器名ドロップ.options = opts
-    if opts:
-        武器名ドロップ.value = opts[0]
+with tab1:
+    st.markdown("選んだ武器に対して、同時に複数武器を狙いやすい周回プランを提案します。")
 
-武器種ドロップ.observe(武器種変更時, names="value")
+    with st.form("plan_form"):
+        選択武器種 = st.selectbox("武器種", 武器種一覧)
+        武器候補 = sorted(武器種ごと[選択武器種])
+        選択武器名 = st.selectbox("武器名", 武器候補)
+        表示件数 = st.slider("表示件数", min_value=1, max_value=30, value=5, step=1)
+        plan_submit = st.form_submit_button("検索")
 
-初期opts = sorted(武器種ごと[武器種一覧[0]])
-武器名ドロップ.options = 初期opts
-武器名ドロップ.value = 初期opts[0]
+    if plan_submit:
+        plans = 武器名から周回プランを提案(
+            選択武器名,
+            WEAPONS,
+            DUNGEONS,
+            top_n=表示件数,
+        )
+        周回プランをstreamlit表示(plans, 選択武器名)
 
-def 検索実行(_):
-    with 出力エリア1:
-        clear_output()
-        weapon_name = 武器名ドロップ.value
-        n = 表示件数スライダー.value
-        plans = 武器名から周回プランを提案(weapon_name, WEAPONS, DUNGEONS, top_n=n)
-        周回プランを文字で表示(plans, weapon_name)
+with tab2:
+    st.markdown("基礎 / 付加 / スキル効果の組み合わせから武器を逆引きします。")
 
-検索ボタン.on_click(検索実行)
+    with st.form("reverse_form"):
+        基礎名 = st.selectbox("基礎", sorted(基礎効果名_to_ID.keys()))
+        付加名 = st.selectbox("付加", sorted(付加効果名_to_ID.keys()))
+        スキル名 = st.selectbox("スキル", sorted(スキル効果名_to_ID.keys()))
+        reverse_submit = st.form_submit_button("逆引き検索")
 
-基礎ドロップ = widgets.Dropdown(options=sorted(基礎効果名_to_ID.keys()), description="基礎:")
-付加ドロップ = widgets.Dropdown(options=sorted(付加効果名_to_ID.keys()), description="付加:")
-スキルドロップ = widgets.Dropdown(options=sorted(スキル効果名_to_ID.keys()), description="スキル:")
-逆引きボタン = widgets.Button(description="逆引き検索")
-出力エリア2 = widgets.Output()
-
-def 逆引き実行(_):
-    with 出力エリア2:
-        clear_output()
-        b = 基礎効果名_to_ID[基礎ドロップ.value]
-        a = 付加効果名_to_ID[付加ドロップ.value]
-        s = スキル効果名_to_ID[スキルドロップ.value]
+    if reverse_submit:
+        b = 基礎効果名_to_ID[基礎名]
+        a = 付加効果名_to_ID[付加名]
+        s = スキル効果名_to_ID[スキル名]
         ws = 基質から武器を逆引き(b, a, s, WEAPONS)
-        print(f"選択基質: {基礎ドロップ.value} / {付加ドロップ.value} / {スキルドロップ.value}")
-        print("==================================================")
-        武器一覧を武器種で表示(ws)
 
-逆引きボタン.on_click(逆引き実行)
-
-tab = widgets.Tab()
-tab.children = [
-    widgets.VBox([武器種ドロップ, 武器名ドロップ, 表示件数スライダー, 検索ボタン, 出力エリア1]),
-    widgets.VBox([基礎ドロップ, 付加ドロップ, スキルドロップ, 逆引きボタン, 出力エリア2]),
-]
-tab.set_title(0, "武器→周回プラン")
-tab.set_title(1, "基質→武器逆引き")
-
-display(tab)
+        st.write(f"選択基質: {基礎名} / {付加名} / {スキル名}")
+        st.divider()
+        武器一覧をstreamlit表示(ws)
