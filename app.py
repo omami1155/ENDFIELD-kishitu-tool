@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Dict, FrozenSet, Iterable, Literal, Tuple
 from collections import defaultdict
-import json
 
-import streamlit as st
+import ipywidgets as widgets
+from IPython.display import display, clear_output
 
 固定スロット = Literal["付加効果", "スキル効果"]
 
@@ -120,6 +120,12 @@ DUNGEONS: dict[str, ダンジョン] = {
         出る付加効果=frozenset({1, 4, 5, 7, 8, 10, 11, 12}),
         出るスキル効果=frozenset({1, 4, 6, 7, 11, 12, 13, 14}),
     ),
+    "清波砦": ダンジョン(
+        name="清波砦",
+        出る基礎効果=frozenset({1, 2, 3, 4, 5}),
+        出る付加効果=frozenset({2, 4, 5, 8, 9, 10, 11, 12}),
+        出るスキル効果=frozenset({2, 4, 5, 6, 9, 11, 12, 14}),
+    )
 }
 
 WEAPONS: list[武器] = [
@@ -137,9 +143,8 @@ WEAPONS: list[武器] = [
     武器("片手剣-テルミット·カッター", 3, 1, 7),
     武器("片手剣-輝かしき名声", 5, 2, 13),
     武器("片手剣-白夜新星", 5, 9, 10),
-    武器("片手剣-緊急設計", 1, 2, 2),
-    武器("片手剣-潮流", 4, 1, 3),
-    
+    武器("片手剣-栄光の記憶", 1, 7, 14),
+
     武器("大剣-探龍", 2, 8, 6),
     武器("大剣-千古恒常", 2, 9, 13),
     武器("大剣-最期の声", 2, 12, 11),
@@ -149,18 +154,14 @@ WEAPONS: list[武器] = [
     武器("大剣-鑑", 5, 1, 2),
     武器("大剣-昔日の逸品", 3, 12, 8),
     武器("大剣-破砕君主", 2, 7, 4),
-    武器("大剣-工業零点一", 2, 1, 2),
-    武器("大剣-鍛冶師", 3, 12, 4),
-    
+
     武器("長柄武器-正義嵌合", 2, 8, 13),
     武器("長柄武器-O.B.J.鋭矛", 3, 2, 10),
     武器("長柄武器-求心の槍", 3, 4, 2),
     武器("長柄武器-負山", 1, 2, 8),
     武器("長柄武器-勇猛", 1, 2, 5),
     武器("長柄武器-J.E.T.", 5, 1, 2),
-    武器("長柄武器-開拓者の道標", 1, 1, 9),
-    武器("長柄武器-アンゲロス·スレイヤー", 3, 10, 2),
-    
+
     武器("拳銃-作品:衆生", 1, 10, 10),
     武器("拳銃-O.B.J.迅速", 1, 8, 6),
     武器("拳銃-合理的決別", 2, 3, 3),
@@ -168,9 +169,9 @@ WEAPONS: list[武器] = [
     武器("拳銃-ナビゲーター", 4, 5, 10),
     武器("拳銃-楔", 5, 7, 10),
     武器("拳銃-同類共食", 5, 10, 10),
-    武器("拳銃-ローアガード", 4, 1, 2),
-    武器("拳銃-長路", 2, 10, 3),
-    
+    武器("拳銃-落草", 1, 1, 6),
+    武器("拳銃-望郷", 1, 5, 2),
+
     武器("アーツユニット-弔いの詩", 4, 1, 14),
     武器("アーツユニット-術無", 3, 8, 9),
     武器("アーツユニット-荒野迷走", 4, 4, 10),
@@ -182,8 +183,6 @@ WEAPONS: list[武器] = [
     武器("アーツユニット-破壊ユニット", 5, 9, 6),
     武器("アーツユニット-遺忘", 4, 10, 14),
     武器("アーツユニット-騎士精神", 3, 12, 11),
-    武器("アーツユニット-オート·ハイパーノヴァ", 4, 10, 9),
-    武器("アーツユニット-蛍光雷羽", 3, 1, 2),
 ]
 
 def 正解基質がダンジョンで出る(w: 武器, d: ダンジョン) -> bool:
@@ -222,7 +221,8 @@ def 武器名から周回プランを提案(
 
         pool = [w for w in weapons if 正解基質がダンジョンで出る(w, d)]
 
-        for fixed_slot in ("付加効果", "スキル効果"):
+        slots: Tuple[固定スロット, ...] = ("付加効果", "スキル効果")
+        for fixed_slot in slots:
             fixed_value = target.付加効果 if fixed_slot == "付加効果" else target.スキル効果
 
             if fixed_slot == "付加効果" and fixed_value not in d.出る付加効果:
@@ -263,7 +263,28 @@ def 武器名から周回プランを提案(
     plans.sort(key=lambda x: (-x.スコア[0], x.dungeon, x.スコア[1], x.絞り.固定する枠, x.絞り.固定する効果))
     return plans[:top_n]
 
-def 逆引き_基質に一致する武器(基礎: int, 付加: int, スキル: int, weapons: Iterable[武器]) -> list[武器]:
+def 周回プランを文字で表示(plans: list[周回プラン], target_name: str) -> None:
+    if not plans:
+        print("プランが見つかりませんでした。")
+        return
+
+    print(f"検索武器: {target_name}")
+    print("==================================================")
+
+    for pl in plans:
+        base_list = " / ".join(表示_基礎(i) for i in sorted(pl.絞り.基礎効果候補))
+        fixed_value_str = 表示_付加(pl.絞り.固定する効果) if pl.絞り.固定する枠 == "付加効果" else 表示_スキル(pl.絞り.固定する効果)
+        others = [w.name for w in pl.同時に狙える武器 if w.name != target_name]
+
+        print(f"\n■ {pl.dungeon}")
+        print(f"  基礎効果候補: {base_list}")
+        print(f"  {pl.絞り.固定する枠}固定: {fixed_value_str}")
+        if others:
+            print(f"  一緒に狙える: {', '.join(others)}")
+        else:
+            print("  他に同時に狙える武器はなし")
+
+def 基質から武器を逆引き(基礎: int, 付加: int, スキル: int, weapons: Iterable[武器]) -> list[武器]:
     out: list[武器] = []
     for w in weapons:
         if w.基礎効果 == 基礎 and w.付加効果 == 付加 and w.スキル効果 == スキル:
@@ -271,213 +292,80 @@ def 逆引き_基質に一致する武器(基礎: int, 付加: int, スキル: i
     out.sort(key=lambda x: x.name)
     return out
 
-def 武器種と武器名に分解(name: str) -> Tuple[str, str]:
-    t, n = name.split("-", 1)
-    return t, n
+def 武器一覧を武器種で表示(ws: list[武器]) -> None:
+    if not ws:
+        print("一致する武器はありません。")
+        return
+    grp: dict[str, list[str]] = defaultdict(list)
+    for w in ws:
+        t, n = w.name.split("-", 1)
+        grp[t].append(n)
+    for t in sorted(grp.keys()):
+        print(f"\n■ {t}")
+        for n in sorted(grp[t]):
+            print(f"  - {t}-{n}")
 
-def フィルタ済み武器(weapons: Iterable[武器], 除外_未所持: bool, 除外_達成済: bool) -> list[武器]:
-    out: list[武器] = []
-    for w in weapons:
-        if 除外_未所持 and not st.session_state["owned"].get(w.name, False):
-            continue
-        if 除外_達成済 and st.session_state["done"].get(w.name, False):
-            continue
-        out.append(w)
-    return out
+武器種ごと = defaultdict(list)
+for w in WEAPONS:
+    武器種, _武器名 = w.name.split("-", 1)
+    武器種ごと[武器種].append(w.name)
 
-st.set_page_config(page_title="基質周回最適化ツール", layout="wide")
-st.title("基質周回最適化ツール")
+武器種一覧 = sorted(武器種ごと.keys())
 
-if "owned" not in st.session_state:
-    st.session_state["owned"] = {w.name: False for w in WEAPONS}
-if "done" not in st.session_state:
-    st.session_state["done"] = {w.name: False for w in WEAPONS}
+武器種ドロップ = widgets.Dropdown(options=武器種一覧, description="武器種:")
+武器名ドロップ = widgets.Dropdown(description="武器名:")
+表示件数スライダー = widgets.IntSlider(value=5, min=1, max=30, step=1, description="表示件数:")
+検索ボタン = widgets.Button(description="検索")
+出力エリア1 = widgets.Output()
 
-def 状態をJSONにする() -> str:
-    data = {
-        "owned": st.session_state["owned"],
-        "done": st.session_state["done"],
-    }
-    return json.dumps(data, ensure_ascii=False, indent=2)
+def 武器種変更時(change):
+    選択種 = change["new"]
+    opts = sorted(武器種ごと[選択種])
+    武器名ドロップ.options = opts
+    if opts:
+        武器名ドロップ.value = opts[0]
 
-def JSONから状態を復元する(json_text: str) -> None:
-    data = json.loads(json_text)
+武器種ドロップ.observe(武器種変更時, names="value")
 
-    owned_in = data.get("owned", {})
-    done_in = data.get("done", {})
+初期opts = sorted(武器種ごと[武器種一覧[0]])
+武器名ドロップ.options = 初期opts
+武器名ドロップ.value = 初期opts[0]
 
-    for w in WEAPONS:
-        st.session_state["owned"][w.name] = bool(owned_in.get(w.name, False))
-        st.session_state["done"][w.name] = bool(done_in.get(w.name, False))
+def 検索実行(_):
+    with 出力エリア1:
+        clear_output()
+        weapon_name = 武器名ドロップ.value
+        n = 表示件数スライダー.value
+        plans = 武器名から周回プランを提案(weapon_name, WEAPONS, DUNGEONS, top_n=n)
+        周回プランを文字で表示(plans, weapon_name)
 
-if "plans_result" not in st.session_state:
-    st.session_state["plans_result"] = None
-if "plans_weapon" not in st.session_state:
-    st.session_state["plans_weapon"] = None
-if "reverse_result" not in st.session_state:
-    st.session_state["reverse_result"] = None
-if "reverse_key" not in st.session_state:
-    st.session_state["reverse_key"] = None
+検索ボタン.on_click(検索実行)
 
-st.sidebar.markdown("## 📢 お知らせ")
+基礎ドロップ = widgets.Dropdown(options=sorted(基礎効果名_to_ID.keys()), description="基礎:")
+付加ドロップ = widgets.Dropdown(options=sorted(付加効果名_to_ID.keys()), description="付加:")
+スキルドロップ = widgets.Dropdown(options=sorted(スキル効果名_to_ID.keys()), description="スキル:")
+逆引きボタン = widgets.Button(description="逆引き検索")
+出力エリア2 = widgets.Output()
 
-st.sidebar.info(
-    "このツールは所持武器・達成状況をもとに基質の周回プランを提案します。\n\n"
-    "初めての方は、下の「所持 / 達成の編集」から自分の状態を設定してください。\n\n"
-    "設定後は『状態を保存』でローカルファイルに保存しておくと、"
-    "次回ファイルのドラッグ＆ドロップで復元できます。\n\n"
-    "復元後は表示に反映させるために、武器種を一度切り替えてください。"
-)
+def 逆引き実行(_):
+    with 出力エリア2:
+        clear_output()
+        b = 基礎効果名_to_ID[基礎ドロップ.value]
+        a = 付加効果名_to_ID[付加ドロップ.value]
+        s = スキル効果名_to_ID[スキルドロップ.value]
+        ws = 基質から武器を逆引き(b, a, s, WEAPONS)
+        print(f"選択基質: {基礎ドロップ.value} / {付加ドロップ.value} / {スキルドロップ.value}")
+        print("==================================================")
+        武器一覧を武器種で表示(ws)
 
-st.sidebar.caption("※ データはブラウザに保存されないため、JSON保存を推奨します")
-st.sidebar.caption("Version 1.1.0 レーヴァテイン実装")
+逆引きボタン.on_click(逆引き実行)
 
-st.sidebar.header("フィルタ")
-除外_未所持 = st.sidebar.checkbox("未所持の武器を除外", value=True)
-除外_達成済 = st.sidebar.checkbox("正解基質を獲得済みの武器を除外", value=True)
+tab = widgets.Tab()
+tab.children = [
+    widgets.VBox([武器種ドロップ, 武器名ドロップ, 表示件数スライダー, 検索ボタン, 出力エリア1]),
+    widgets.VBox([基礎ドロップ, 付加ドロップ, スキルドロップ, 逆引きボタン, 出力エリア2]),
+]
+tab.set_title(0, "武器→周回プラン")
+tab.set_title(1, "基質→武器逆引き")
 
-st.sidebar.subheader("保存 / 復元")
-
-json_text = 状態をJSONにする()
-st.sidebar.download_button(
-    label="状態を保存（JSON）",
-    data=json_text,
-    file_name="kisitu_state.json",
-    mime="application/json",
-)
-
-up = st.sidebar.file_uploader("状態を読み込み（JSON）", type=["json"])
-
-if "last_uploaded_file_id" not in st.session_state:
-    st.session_state["last_uploaded_file_id"] = None
-
-if up is not None:
-    file_id = (up.name, up.size)
-    if st.session_state["last_uploaded_file_id"] != file_id:
-        try:
-            JSONから状態を復元する(up.read().decode("utf-8"))
-            st.session_state["last_uploaded_file_id"] = file_id
-            st.sidebar.success("復元しました。")
-            st.rerun()
-        except Exception as e:
-            st.sidebar.error(f"読み込みに失敗しました: {e}")
-
-if st.sidebar.button("状態を初期化（全未所持/未達成）"):
-    st.session_state["owned"] = {w.name: False for w in WEAPONS}
-    st.session_state["done"] = {w.name: False for w in WEAPONS}
-    st.session_state["last_uploaded_file_id"] = None
-    st.rerun()
-
-st.sidebar.divider()
-st.sidebar.subheader("所持 / 達成の編集")
-
-武器種一覧_sidebar = sorted({武器種と武器名に分解(w.name)[0] for w in WEAPONS})
-編集_武器種 = st.sidebar.selectbox("武器種", 武器種一覧_sidebar, key="edit_type")
-
-編集対象 = sorted([w.name for w in WEAPONS if 武器種と武器名に分解(w.name)[0] == 編集_武器種])
-
-for name in 編集対象:
-    col1, col2 = st.sidebar.columns([3, 1])
-    with col1:
-        st.session_state["owned"][name] = st.checkbox(name, value=st.session_state["owned"].get(name, False), key=f"owned_{name}")
-    with col2:
-        done_key = f"done_{name}"
-        done_val = st.checkbox("達成", value=st.session_state["done"].get(name, False), key=done_key)
-
-        prev_done = st.session_state["done"].get(name, False)
-        st.session_state["done"][name] = done_val
-
-        if done_val:
-            st.session_state["owned"][name] = True
-
-        if (not prev_done) and done_val:
-            st.rerun()
-
-tab1, tab2 = st.tabs(["周回プラン", "基質逆引き"])
-
-with tab1:
-    武器種ごと = defaultdict(list)
-    for w in WEAPONS:
-        t, _ = 武器種と武器名に分解(w.name)
-        武器種ごと[t].append(w.name)
-
-    武器種一覧 = sorted(武器種ごと.keys())
-    武器種 = st.selectbox("武器種", 武器種一覧, key="weapon_type")
-
-    candidates = []
-    for name in sorted(武器種ごと[武器種]):
-        if 除外_未所持 and not st.session_state["owned"].get(name, False):
-            continue
-        if 除外_達成済 and st.session_state["done"].get(name, False):
-            continue
-        candidates.append(name)
-
-    if not candidates:
-        st.warning("この条件だと選べる武器がありません（サイドバーで所持/達成を調整してください）。")
-    else:
-        武器名 = st.selectbox("武器名", candidates, key="weapon_name")
-
-        表示件数 = st.slider("表示件数", min_value=1, max_value=30, value=5, step=1, key="topn")
-
-        if st.button("検索", type="primary", key="search_btn"):
-            wf = フィルタ済み武器(WEAPONS, 除外_未所持, 除外_達成済)
-            plans = 武器名から周回プランを提案(武器名, wf, DUNGEONS, top_n=表示件数)
-            st.session_state["plans_result"] = plans
-            st.session_state["plans_weapon"] = 武器名
-
-    plans = st.session_state.get("plans_result")
-    target_name = st.session_state.get("plans_weapon")
-
-    if plans is not None and target_name is not None:
-        if not plans:
-            st.warning("プランが見つかりませんでした。")
-        else:
-            st.subheader(f"検索武器: {target_name}")
-            for pl in plans:
-                base_list = " / ".join(表示_基礎(i) for i in sorted(pl.絞り.基礎効果候補))
-                fixed_value_str = 表示_付加(pl.絞り.固定する効果) if pl.絞り.固定する枠 == "付加効果" else 表示_スキル(pl.絞り.固定する効果)
-                others = [w.name for w in pl.同時に狙える武器 if w.name != target_name]
-
-                st.markdown(f"### ■ {pl.dungeon}")
-                st.write(f"基礎効果候補: {base_list}")
-                st.write(f"{pl.絞り.固定する枠}固定: {fixed_value_str}")
-                if others:
-                    st.write("一緒に狙える武器: " + ", ".join(others))
-                else:
-                    st.write("一緒に狙える武器はありません")
-
-with tab2:
-    基礎名 = st.selectbox("基礎効果", sorted(基礎効果名_to_ID.keys()), key="rev_base")
-    付加名 = st.selectbox("付加効果", sorted(付加効果名_to_ID.keys()), key="rev_add")
-    スキル名 = st.selectbox("スキル効果", sorted(スキル効果名_to_ID.keys()), key="rev_skill")
-
-    if st.button("逆引き検索", type="primary", key="rev_btn"):
-        b = 基礎効果名_to_ID[基礎名]
-        a = 付加効果名_to_ID[付加名]
-        s = スキル効果名_to_ID[スキル名]
-
-        wf = フィルタ済み武器(WEAPONS, 除外_未所持, 除外_達成済)
-        ws = 逆引き_基質に一致する武器(b, a, s, wf)
-
-        st.session_state["reverse_result"] = ws
-        st.session_state["reverse_key"] = (基礎名, 付加名, スキル名)
-
-    ws = st.session_state.get("reverse_result")
-    k = st.session_state.get("reverse_key")
-
-    if ws is not None and k is not None:
-        基礎名2, 付加名2, スキル名2 = k
-        st.subheader(f"選択基質: {基礎名2} / {付加名2} / {スキル名2}")
-
-        if not ws:
-            st.warning("一致する武器が無い、または全て達成済みです (砕いておK)")
-        else:
-            grp: dict[str, list[str]] = defaultdict(list)
-            for w in ws:
-                t, n = 武器種と武器名に分解(w.name)
-                grp[t].append(n)
-
-            for t in sorted(grp.keys()):
-                st.markdown(f"### ■ {t}")
-                for n in sorted(grp[t]):
-                    st.write(f"- {t}-{n}")
+display(tab)
